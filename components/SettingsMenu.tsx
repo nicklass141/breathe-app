@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSupabaseAuthStatus } from "@/lib/supabase/auth-status";
+import { createClient } from "@/lib/supabase/client";
 
 const vibrationKey = "vibrationEnabled";
 
@@ -15,7 +18,15 @@ function readVibrationSetting() {
 }
 
 export function SettingsMenu() {
+  const {
+    error: authError,
+    isConfigured,
+    isLoading: isAuthLoading,
+    user,
+  } = useSupabaseAuthStatus();
+  const [authActionError, setAuthActionError] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
 
   useEffect(() => {
@@ -36,6 +47,26 @@ export function SettingsMenu() {
 
       return nextValue;
     });
+  }
+
+  async function handleLogout() {
+    setAuthActionError("");
+    setIsLoggingOut(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        setAuthActionError(error.message);
+      }
+    } catch (error) {
+      setAuthActionError(
+        error instanceof Error ? error.message : "Supabase is not configured.",
+      );
+    } finally {
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -98,6 +129,71 @@ export function SettingsMenu() {
                     }`}
                   />
                 </button>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-white/8 bg-[#0f0f0f] p-4">
+                <p className="text-sm font-semibold text-[#f4f4f2]">
+                  Account
+                </p>
+
+                {isAuthLoading ? (
+                  <p className="mt-2 text-sm leading-6 text-[#9a9a95]">
+                    Checking account...
+                  </p>
+                ) : user ? (
+                  <div className="mt-2 space-y-3">
+                    <div>
+                      <p className="text-sm leading-6 text-[#d1d1cc]">
+                        Signed in as {user.email}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[#9a9a95]">
+                        Syncing will be added later. For now, entries still save
+                        on this device.
+                      </p>
+                    </div>
+                    <button
+                      className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-[#f4f4f2] transition hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={isLoggingOut}
+                      onClick={handleLogout}
+                      type="button"
+                    >
+                      {isLoggingOut ? "Logging out..." : "Log out"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-3">
+                    <p className="text-sm leading-6 text-[#9a9a95]">
+                      Guest mode is active. Your data is saved on this device
+                      only.
+                    </p>
+                    {isConfigured ? (
+                      <Link
+                        className="inline-flex rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-[#f4f4f2] transition hover:bg-white/8"
+                        href="/auth"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Log in
+                      </Link>
+                    ) : (
+                      <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs leading-5 text-[#bdbdb8]">
+                        Supabase is not configured yet. Add the public
+                        Supabase environment variables to enable login.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {authActionError ? (
+                  <p className="mt-3 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-xs leading-5 text-red-100">
+                    {authActionError}
+                  </p>
+                ) : null}
+
+                {!isConfigured && authError ? (
+                  <p className="mt-3 text-xs leading-5 text-[#7f7f7a]">
+                    {authError}
+                  </p>
+                ) : null}
               </div>
 
               <p className="rounded-[1.5rem] bg-[#0f0f0f] p-4 text-sm leading-6 text-[#9a9a95]">
