@@ -47,7 +47,7 @@ input {
   }
 
   50% {
-    transform: translate3d(0.18rem, -0.22rem, 0);
+    transform: translate3d(0.08rem, -0.1rem, 0);
   }
 }
 

@@ -8,29 +8,29 @@ const phaseStyles = {
   INHALE:
     "scale-[1.14] duration-[4000ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
   HOLD:
-    "scale-[1.08] duration-[1800ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
+    "scale-[1.14] duration-[1800ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
   "HOLD IN":
-    "scale-[1.08] duration-[1800ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
+    "scale-[1.14] duration-[1800ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
   "HOLD OUT":
-    "scale-[0.9] duration-[1800ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
+    "scale-[0.88] duration-[1800ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
   EXHALE:
     "scale-[0.88] duration-[6000ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
 };
 
 const innerLayerStyles = {
-  INHALE: "scale-[1.04] translate-x-0.5 -translate-y-0.5 opacity-95",
-  HOLD: "scale-[1.02] opacity-90",
-  "HOLD IN": "scale-[1.02] opacity-90",
-  "HOLD OUT": "scale-[0.97] opacity-82",
-  EXHALE: "scale-[0.94] -translate-x-0.5 translate-y-0.5 opacity-78",
+  INHALE: "opacity-95",
+  HOLD: "opacity-92",
+  "HOLD IN": "opacity-92",
+  "HOLD OUT": "opacity-78",
+  EXHALE: "opacity-78",
 };
 
 const highlightStyles = {
-  INHALE: "scale-[1.05] translate-x-0.5 -translate-y-0.5 opacity-90",
-  HOLD: "scale-[1.02] opacity-80",
-  "HOLD IN": "scale-[1.02] opacity-80",
-  "HOLD OUT": "scale-[0.96] opacity-65",
-  EXHALE: "scale-[0.92] -translate-x-0.5 translate-y-0.5 opacity-60",
+  INHALE: "opacity-90",
+  HOLD: "opacity-82",
+  "HOLD IN": "opacity-82",
+  "HOLD OUT": "opacity-60",
+  EXHALE: "opacity-60",
 };
 
 export function BreathingOrb({ phase = "INHALE" }: BreathingOrbProps) {

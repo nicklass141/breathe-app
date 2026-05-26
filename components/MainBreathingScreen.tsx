@@ -188,10 +188,11 @@ export function MainBreathingScreen() {
 
   const controlsDisabled = hasStarted && isRunning;
   const primaryControlLabel = !hasStarted
-    ? "Start session"
+    ? "Start"
     : isRunning
       ? "Pause"
       : "Resume";
+  const orbPhase = hasStarted ? phase : "EXHALE";
 
   return (
     <section className="flex flex-1 flex-col gap-[clamp(0.9rem,2.1vh,1.25rem)] overflow-hidden pb-2 text-center">
@@ -200,7 +201,7 @@ export function MainBreathingScreen() {
       </p>
 
       <div className="flex flex-col items-center gap-[clamp(0.95rem,2.2vh,1.35rem)]">
-        <BreathingOrb phase={phase} />
+        <BreathingOrb phase={orbPhase} />
 
         <div className="min-h-[3.9rem]">
           <p className="text-[1.65rem] font-semibold leading-tight tracking-[-0.02em] text-[#f4f4f2]">
@@ -228,27 +229,18 @@ export function MainBreathingScreen() {
           />
         </div>
 
-        <div className={`${hasStarted ? "grid grid-cols-2 gap-3" : ""}`}>
+        <div className="flex justify-center">
           <button
-            className={`min-h-14 rounded-[1.75rem] px-4 text-base font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505] ${
+            className={`min-h-[3.25rem] w-[78%] max-w-[18rem] rounded-[1.75rem] px-4 text-base font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505] ${
               hasStarted && isRunning
                 ? "border border-white/10 bg-[#151515] text-[#f4f4f2] hover:bg-[#1d1d1d]"
-                : "w-full bg-[#f2f2ee] text-[#050505] shadow-[0_18px_45px_rgba(255,255,255,0.11)] hover:bg-white"
+                : "bg-[#f2f2ee] text-[#050505] shadow-[0_18px_45px_rgba(255,255,255,0.11)] hover:bg-white"
             }`}
             onClick={handlePrimaryControl}
             type="button"
           >
             {primaryControlLabel}
           </button>
-          {hasStarted ? (
-            <button
-              className="min-h-14 rounded-[1.75rem] border border-white/10 bg-[#151515] px-4 text-base font-semibold text-[#f4f4f2] transition hover:bg-[#1d1d1d] focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505]"
-              onClick={() => resetSession()}
-              type="button"
-            >
-              Reset
-            </button>
-          ) : null}
         </div>
 
         <p className="text-xs leading-5 text-[#777772]">
@@ -321,7 +313,6 @@ function CompactSelector({
       </span>
       <span className="mt-1 flex items-center justify-between gap-2 text-sm font-semibold text-[#f4f4f2]">
         {value}
-        <span className="text-[#bdbdb8]">v</span>
       </span>
     </button>
   );
