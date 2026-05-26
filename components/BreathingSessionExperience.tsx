@@ -3,64 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BreathingOrb } from "@/components/BreathingOrb";
-import { DurationSelector } from "@/components/DurationSelector";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { SessionTypeSelector } from "@/components/SessionTypeSelector";
-
-type BreathingPhase = "INHALE" | "HOLD" | "HOLD IN" | "HOLD OUT" | "EXHALE";
-
-type PhaseStep = {
-  duration: number;
-  phase: BreathingPhase;
-};
-
-const breathingPatterns = [
-  {
-    description: "4 in / 2 hold / 6 out",
-    id: "balance",
-    name: "Balance",
-    phases: [
-      { duration: 4, phase: "INHALE" },
-      { duration: 2, phase: "HOLD" },
-      { duration: 6, phase: "EXHALE" },
-    ],
-  },
-  {
-    description: "4 / 4 / 4 / 4",
-    id: "box",
-    name: "Box Breathing",
-    phases: [
-      { duration: 4, phase: "INHALE" },
-      { duration: 4, phase: "HOLD IN" },
-      { duration: 4, phase: "EXHALE" },
-      { duration: 4, phase: "HOLD OUT" },
-    ],
-  },
-  {
-    description: "4 in / 6 out",
-    id: "calm",
-    name: "Calm",
-    phases: [
-      { duration: 4, phase: "INHALE" },
-      { duration: 6, phase: "EXHALE" },
-    ],
-  },
-  {
-    description: "5 in / 2 hold / 7 out",
-    id: "deep-reset",
-    name: "Deep Reset",
-    phases: [
-      { duration: 5, phase: "INHALE" },
-      { duration: 2, phase: "HOLD" },
-      { duration: 7, phase: "EXHALE" },
-    ],
-  },
-] satisfies {
-  description: string;
-  id: string;
-  name: string;
-  phases: PhaseStep[];
-}[];
+import {
+  defaultMinutes,
+  defaultPatternId,
+  getCycleSeconds,
+  getPatternById,
+  type BreathingPhase,
+  type PhaseStep,
+} from "@/components/breathingPatterns";
 
 function isVibrationEnabled() {
   try {
@@ -79,10 +30,6 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-function getCycleSeconds(phases: PhaseStep[]) {
-  return phases.reduce((totalSeconds, phase) => totalSeconds + phase.duration, 0);
-}
-
 function getPhase(elapsedSeconds: number, phases: PhaseStep[]): BreathingPhase {
   const cycleSeconds = getCycleSeconds(phases);
   const cyclePosition = elapsedSeconds % cycleSeconds;
@@ -99,15 +46,19 @@ function getPhase(elapsedSeconds: number, phases: PhaseStep[]): BreathingPhase {
   return phases[0].phase;
 }
 
-export function BreathingSessionExperience() {
+type BreathingSessionExperienceProps = {
+  initialMinutes?: number;
+  initialPatternId?: string;
+};
+
+export function BreathingSessionExperience({
+  initialMinutes = defaultMinutes,
+  initialPatternId = defaultPatternId,
+}: BreathingSessionExperienceProps) {
   const router = useRouter();
-  const [selectedPatternId, setSelectedPatternId] = useState("balance");
-  const [selectedMinutes, setSelectedMinutes] = useState(2);
-  const selectedPattern =
-    breathingPatterns.find((pattern) => pattern.id === selectedPatternId) ??
-    breathingPatterns[0];
+  const selectedPattern = getPatternById(initialPatternId);
   const cycleSeconds = getCycleSeconds(selectedPattern.phases);
-  const totalSeconds = selectedMinutes * 60;
+  const totalSeconds = initialMinutes * 60;
   const [secondsRemaining, setSecondsRemaining] = useState(totalSeconds);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
@@ -177,7 +128,7 @@ export function BreathingSessionExperience() {
         "pendingBreathingSession",
         JSON.stringify({
           completedAt: new Date().toISOString(),
-          duration: `${selectedMinutes} min`,
+          duration: `${initialMinutes} min`,
           durationSeconds: totalSeconds,
           patternName: selectedPattern.name,
           sessionType: selectedPattern.name,
@@ -192,7 +143,7 @@ export function BreathingSessionExperience() {
     hasStarted,
     router,
     secondsRemaining,
-    selectedMinutes,
+    initialMinutes,
     selectedPattern.name,
     totalSeconds,
   ]);
@@ -203,24 +154,6 @@ export function BreathingSessionExperience() {
     setIsRunning(false);
     setHasStarted(false);
     setSecondsRemaining(nextTotalSeconds);
-  }
-
-  function handlePatternSelect(patternId: string) {
-    if (isRunning) {
-      return;
-    }
-
-    setSelectedPatternId(patternId);
-    resetSession();
-  }
-
-  function handleDurationSelect(minutes: number) {
-    if (isRunning) {
-      return;
-    }
-
-    setSelectedMinutes(minutes);
-    resetSession(minutes * 60);
   }
 
   function handlePrimaryControl() {
@@ -246,7 +179,7 @@ export function BreathingSessionExperience() {
           {selectedPattern.name}
         </p>
         <p className="mt-2 text-xl font-semibold text-[#77877b]">
-          {sessionDetail}
+          {initialMinutes} min / {sessionDetail}
         </p>
       </div>
 
@@ -261,19 +194,6 @@ export function BreathingSessionExperience() {
             {formatTime(secondsRemaining)} remaining
           </p>
         </div>
-
-        <DurationSelector
-          disabled={isRunning}
-          onSelect={handleDurationSelect}
-          selectedMinutes={selectedMinutes}
-        />
-
-        <SessionTypeSelector
-          disabled={isRunning}
-          onSelect={handlePatternSelect}
-          patterns={breathingPatterns}
-          selectedPatternId={selectedPatternId}
-        />
 
         <p className="text-xs leading-5 text-[#667467]">
           Breathe gently. Stop if you feel uncomfortable.

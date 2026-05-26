@@ -7,7 +7,7 @@ type AppShellProps = {
 };
 
 const navItems = [
-  { href: "/", label: "Breathe", value: "breathe" },
+  { href: "/breathing", label: "Breathe", value: "breathe" },
   { href: "/journal", label: "Journal", value: "journal" },
   { href: "/history", label: "History", value: "history" },
 ] as const;

@@ -1,10 +1,13 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/AppShell";
-import { BreathingSessionExperience } from "@/components/BreathingSessionExperience";
+import { SessionFromSearchParams } from "@/components/SessionFromSearchParams";
 
 export default function BreathingSessionPage() {
   return (
     <AppShell activeTab="breathe">
-      <BreathingSessionExperience />
+      <Suspense fallback={null}>
+        <SessionFromSearchParams />
+      </Suspense>
     </AppShell>
   );
 }
