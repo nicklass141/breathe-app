@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07100d;
-  --foreground: #f5efe2;
+  --background: #050505;
+  --foreground: #f4f4f2;
 }
 
 @theme inline {
@@ -23,4 +23,61 @@ a,
 textarea,
 input {
   -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes bubble-morph {
+  0%,
+  100% {
+    border-radius: 49% 51% 47% 53% / 48% 46% 54% 52%;
+  }
+
+  45% {
+    border-radius: 53% 47% 51% 49% / 45% 51% 49% 55%;
+  }
+
+  70% {
+    border-radius: 47% 53% 49% 51% / 52% 47% 53% 48%;
+  }
+}
+
+@keyframes bubble-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0.18rem, -0.22rem, 0);
+  }
+}
+
+@keyframes bubble-inner-drift {
+  0%,
+  100% {
+    border-radius: 47% 53% 49% 51% / 48% 48% 52% 52%;
+  }
+
+  50% {
+    border-radius: 52% 48% 46% 54% / 45% 53% 47% 55%;
+  }
+}
+
+.breathing-bubble-morph {
+  animation: bubble-morph 9s ease-in-out infinite;
+}
+
+.breathing-orb-float {
+  animation: bubble-float 8s ease-in-out infinite;
+}
+
+.breathing-orb-drift {
+  animation: bubble-float 11s ease-in-out infinite reverse;
+}
+
+.breathing-orb-inner {
+  animation: bubble-inner-drift 10s ease-in-out infinite;
+}
+
+.breathing-orb-highlight {
+  animation: bubble-float 7s ease-in-out infinite;
 }

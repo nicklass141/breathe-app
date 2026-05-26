@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SoftCard } from "@/components/SoftCard";
 
+const nearbyEntryWindowMs = 10 * 60 * 1000;
+
 type BreathingSession = {
   completedAt?: string;
   date: string;
@@ -13,15 +15,25 @@ type BreathingSession = {
 };
 
 type JournalEntry = {
+  breathingSessionId?: string;
   completedAt?: string;
   date: string;
   duration?: string;
   id: string;
   linkedSession?: boolean;
+  moodTags?: string[];
   reflection1: string;
   reflection2: string;
   reflection3: string;
   sessionType?: string;
+};
+
+type HistoryGroup = {
+  breathingSession?: BreathingSession;
+  id: string;
+  journalEntry?: JournalEntry;
+  sortTime: number;
+  type: "breath-journal" | "breath-only" | "journal-only";
 };
 
 function formatDate(value?: string) {
@@ -51,11 +63,280 @@ function readLocalArray<T>(key: string) {
   }
 }
 
+function getTime(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const time = new Date(value).getTime();
+
+  return Number.isNaN(time) ? null : time;
+}
+
+function getBreathingTime(session: BreathingSession) {
+  return getTime(session.completedAt) ?? getTime(session.date) ?? 0;
+}
+
+function getJournalTime(entry: JournalEntry) {
+  return getTime(entry.date) ?? getTime(entry.completedAt) ?? 0;
+}
+
+function getGroupDate(group: HistoryGroup) {
+  return (
+    group.journalEntry?.date ??
+    group.breathingSession?.completedAt ??
+    group.breathingSession?.date
+  );
+}
+
+function getReflectionPreview(entry?: JournalEntry) {
+  const reflection = [
+    entry?.reflection1,
+    entry?.reflection2,
+    entry?.reflection3,
+  ]
+    .map((value) => value?.trim())
+    .find(Boolean);
+
+  if (!reflection) {
+    return "";
+  }
+
+  return reflection.length > 120 ? `${reflection.slice(0, 117)}...` : reflection;
+}
+
+function getMoodTags(entry?: JournalEntry) {
+  return Array.isArray(entry?.moodTags) ? entry.moodTags.filter(Boolean) : [];
+}
+
+function hasLinkedBreathingData(entry: JournalEntry) {
+  return (
+    entry.linkedSession !== false &&
+    Boolean(entry.sessionType && entry.duration)
+  );
+}
+
+function findExplicitBreathingSession(
+  entry: JournalEntry,
+  breathingSessions: BreathingSession[],
+  usedBreathingIds: Set<string>,
+) {
+  if (entry.breathingSessionId) {
+    const sessionById = breathingSessions.find(
+      (session) =>
+        session.id === entry.breathingSessionId &&
+        !usedBreathingIds.has(session.id),
+    );
+
+    if (sessionById) {
+      return sessionById;
+    }
+  }
+
+  if (!hasLinkedBreathingData(entry)) {
+    return null;
+  }
+
+  return (
+    breathingSessions.find((session) => {
+      if (usedBreathingIds.has(session.id)) {
+        return false;
+      }
+
+      return (
+        session.sessionType === entry.sessionType &&
+        session.duration === entry.duration &&
+        session.completedAt === entry.completedAt
+      );
+    }) ?? null
+  );
+}
+
+function findNearbyBreathingSession(
+  entry: JournalEntry,
+  breathingSessions: BreathingSession[],
+  usedBreathingIds: Set<string>,
+) {
+  const journalTime = getJournalTime(entry);
+  let closestSession: BreathingSession | null = null;
+  let closestDistance = nearbyEntryWindowMs + 1;
+
+  for (const session of breathingSessions) {
+    if (usedBreathingIds.has(session.id)) {
+      continue;
+    }
+
+    const distance = Math.abs(getBreathingTime(session) - journalTime);
+
+    if (distance <= nearbyEntryWindowMs && distance < closestDistance) {
+      closestDistance = distance;
+      closestSession = session;
+    }
+  }
+
+  return closestSession;
+}
+
+function buildHistoryGroups(
+  breathingSessions: BreathingSession[],
+  journalEntries: JournalEntry[],
+) {
+  const groups: HistoryGroup[] = [];
+  const usedBreathingIds = new Set<string>();
+  const usedJournalIds = new Set<string>();
+
+  for (const entry of journalEntries) {
+    const session = findExplicitBreathingSession(
+      entry,
+      breathingSessions,
+      usedBreathingIds,
+    );
+
+    if (!session) {
+      continue;
+    }
+
+    usedBreathingIds.add(session.id);
+    usedJournalIds.add(entry.id);
+    groups.push({
+      breathingSession: session,
+      id: `combined-${session.id}-${entry.id}`,
+      journalEntry: entry,
+      sortTime: Math.max(getBreathingTime(session), getJournalTime(entry)),
+      type: "breath-journal",
+    });
+  }
+
+  for (const entry of journalEntries) {
+    if (usedJournalIds.has(entry.id)) {
+      continue;
+    }
+
+    const session = findNearbyBreathingSession(
+      entry,
+      breathingSessions,
+      usedBreathingIds,
+    );
+
+    if (!session) {
+      continue;
+    }
+
+    usedBreathingIds.add(session.id);
+    usedJournalIds.add(entry.id);
+    groups.push({
+      breathingSession: session,
+      id: `nearby-${session.id}-${entry.id}`,
+      journalEntry: entry,
+      sortTime: Math.max(getBreathingTime(session), getJournalTime(entry)),
+      type: "breath-journal",
+    });
+  }
+
+  for (const session of breathingSessions) {
+    if (usedBreathingIds.has(session.id)) {
+      continue;
+    }
+
+    groups.push({
+      breathingSession: session,
+      id: `breath-${session.id}`,
+      sortTime: getBreathingTime(session),
+      type: "breath-only",
+    });
+  }
+
+  for (const entry of journalEntries) {
+    if (usedJournalIds.has(entry.id)) {
+      continue;
+    }
+
+    groups.push({
+      id: `journal-${entry.id}`,
+      journalEntry: entry,
+      sortTime: getJournalTime(entry),
+      type: "journal-only",
+    });
+  }
+
+  return groups.sort((firstGroup, secondGroup) => {
+    return secondGroup.sortTime - firstGroup.sortTime;
+  });
+}
+
 function EmptyHistorySection({ message }: { message: string }) {
   return (
     <SoftCard>
-      <div className="mb-5 h-12 w-12 rounded-full bg-[#dbe8c6]/10 shadow-[0_0_35px_rgba(219,232,198,0.1)]" />
-      <p className="text-base leading-7 text-[#8a9a8d]">{message}</p>
+      <div className="mb-5 h-12 w-12 rounded-full bg-white/8 shadow-[0_0_35px_rgba(255,255,255,0.08)]" />
+      <p className="text-base leading-7 text-[#9a9a95]">{message}</p>
+    </SoftCard>
+  );
+}
+
+function HistoryLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="shrink-0 whitespace-nowrap rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[0.7rem] font-semibold uppercase text-[#d1d1cc]">
+      {children}
+    </span>
+  );
+}
+
+function MoodTagList({ tags }: { tags: string[] }) {
+  if (!tags.length) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span
+          className="rounded-full bg-[#0f0f0f] px-2.5 py-1 text-xs font-semibold text-[#c7c7c2]"
+          key={tag}
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HistoryCard({ group }: { group: HistoryGroup }) {
+  const moodTags = getMoodTags(group.journalEntry);
+  const reflectionPreview = getReflectionPreview(group.journalEntry);
+
+  return (
+    <SoftCard className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-[#f4f4f2]">
+            {formatDate(getGroupDate(group))}
+          </p>
+          {group.breathingSession ? (
+            <p className="mt-1 text-sm text-[#9a9a95]">
+              {group.breathingSession.sessionType} -{" "}
+              {group.breathingSession.duration}
+            </p>
+          ) : null}
+        </div>
+        <HistoryLabel>
+          {group.type === "breath-journal"
+            ? "Breath + Journal"
+            : group.type === "breath-only"
+              ? "Breath only"
+              : "Journal only"}
+        </HistoryLabel>
+      </div>
+
+      {moodTags.length || reflectionPreview ? (
+        <div className="mt-4 space-y-3">
+          <MoodTagList tags={moodTags} />
+          {reflectionPreview ? (
+            <p className="rounded-[1.25rem] bg-[#0f0f0f] px-4 py-3 text-sm leading-6 text-[#d8d8d3]">
+              {reflectionPreview}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </SoftCard>
   );
 }
@@ -84,95 +365,36 @@ export function HistoryArchive() {
     setJournalEntries([]);
   }
 
+  const historyGroups = buildHistoryGroups(breathingSessions, journalEntries);
+
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#9daf96]">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#bdbdb8]">
           History
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.02em] text-[#f8f1e3]">
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.02em] text-[#f4f4f2]">
           Your quiet archive
         </h1>
-        <p className="mt-3 text-base leading-7 text-[#8a9a8d]">
-          Breathing sessions and journal entries will appear here over time.
+        <p className="mt-3 text-base leading-7 text-[#9a9a95]">
+          Breathing and journal moments are grouped when they belong together.
         </p>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-[#f8f1e3]">
-          Breathing History
-        </h2>
-        {breathingSessions.length ? (
-          <div className="grid gap-3">
-            {breathingSessions.map((session) => (
-              <SoftCard className="p-4" key={session.id}>
-                <p className="text-sm font-semibold text-[#f8f1e3]">
-                  {formatDate(session.completedAt ?? session.date)}
-                </p>
-                <p className="mt-2 text-sm text-[#8a9a8d]">
-                  {session.sessionType} - {session.duration}
-                </p>
-              </SoftCard>
-            ))}
-          </div>
-        ) : (
-          <EmptyHistorySection message="No breathing sessions yet." />
-        )}
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-[#f8f1e3]">
-          Journal History
-        </h2>
-        {journalEntries.length ? (
-          <div className="grid gap-3">
-            {journalEntries.map((entry) => {
-              const reflections = [
-                entry.reflection1,
-                entry.reflection2,
-                entry.reflection3,
-              ].filter(Boolean);
-              const hasLinkedSession =
-                entry.linkedSession !== false &&
-                Boolean(entry.sessionType && entry.duration);
-
-              return (
-                <SoftCard className="p-4" key={entry.id}>
-                  <p className="text-sm font-semibold text-[#f8f1e3]">
-                    {formatDate(entry.date)}
-                  </p>
-                  {hasLinkedSession ? (
-                    <p className="mt-2 text-sm text-[#9daf96]">
-                      Linked to {entry.sessionType} - {entry.duration}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-sm text-[#9daf96]">
-                      Journal only
-                    </p>
-                  )}
-                  <div className="mt-4 space-y-3">
-                    {reflections.map((reflection) => (
-                      <p
-                        className="rounded-[1.25rem] bg-[#0a1410] px-4 py-3 text-sm leading-6 text-[#d5decf]"
-                        key={reflection}
-                      >
-                        {reflection}
-                      </p>
-                    ))}
-                  </div>
-                </SoftCard>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyHistorySection message="No journal entries yet." />
-        )}
-      </div>
+      {historyGroups.length ? (
+        <div className="grid gap-3">
+          {historyGroups.map((group) => (
+            <HistoryCard group={group} key={group.id} />
+          ))}
+        </div>
+      ) : (
+        <EmptyHistorySection message="No breathing or journal history yet." />
+      )}
 
       <div className="space-y-3 pt-2">
-        <PrimaryButton href="/breathing">Start a new session</PrimaryButton>
+        <PrimaryButton href="/">Start a new session</PrimaryButton>
         <button
-          className="min-h-12 w-full rounded-[1.5rem] text-sm font-semibold text-[#667467] transition hover:bg-white/5 hover:text-[#f5efe2]"
+          className="min-h-12 w-full rounded-[1.5rem] text-sm font-semibold text-[#777772] transition hover:bg-white/5 hover:text-[#f4f4f2]"
           onClick={handleClearHistory}
           type="button"
         >

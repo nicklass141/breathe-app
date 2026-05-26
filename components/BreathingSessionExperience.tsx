@@ -175,10 +175,10 @@ export function BreathingSessionExperience({
   return (
     <section className="flex flex-1 flex-col justify-between gap-8 text-center">
       <div className="pt-8">
-        <p className="text-sm font-semibold text-[#f5efe2]">
+        <p className="text-sm font-semibold text-[#f4f4f2]">
           {selectedPattern.name}
         </p>
-        <p className="mt-2 text-xl font-semibold text-[#77877b]">
+        <p className="mt-2 text-xl font-semibold text-[#8a8a85]">
           {initialMinutes} min / {sessionDetail}
         </p>
       </div>
@@ -187,15 +187,15 @@ export function BreathingSessionExperience({
 
       <div className="space-y-5">
         <div>
-          <p className="text-2xl font-semibold text-[#f8f1e3]">
+          <p className="text-2xl font-semibold text-[#f4f4f2]">
             {phase.charAt(0) + phase.slice(1).toLowerCase()}
           </p>
-          <p className="mt-2 text-sm text-[#849486]" data-testid="timer">
+          <p className="mt-2 text-sm text-[#8f8f8a]" data-testid="timer">
             {formatTime(secondsRemaining)} remaining
           </p>
         </div>
 
-        <p className="text-xs leading-5 text-[#667467]">
+        <p className="text-xs leading-5 text-[#777772]">
           Breathe gently. Stop if you feel uncomfortable.
         </p>
 

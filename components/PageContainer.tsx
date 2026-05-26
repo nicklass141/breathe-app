@@ -6,17 +6,17 @@ type PageContainerProps = {
 
 export function PageContainer({ children }: PageContainerProps) {
   return (
-    <div className="min-h-screen bg-stone-50 text-slate-900">
-      <header className="border-b border-teal-100 bg-white/80">
+    <div className="min-h-screen bg-[#050505] text-[#f4f4f2]">
+      <header className="border-b border-white/10 bg-[#111111]/85">
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <Link className="text-base font-semibold text-teal-950" href="/">
+          <Link className="text-base font-semibold text-[#f4f4f2]" href="/">
             StillSpace
           </Link>
-          <div className="flex items-center gap-4 text-sm font-medium text-slate-600">
-            <Link className="hover:text-teal-800" href="/breathing">
+          <div className="flex items-center gap-4 text-sm font-medium text-[#9a9a95]">
+            <Link className="hover:text-[#f4f4f2]" href="/breathing">
               Breathe
             </Link>
-            <Link className="hover:text-teal-800" href="/history">
+            <Link className="hover:text-[#f4f4f2]" href="/history">
               History
             </Link>
           </div>

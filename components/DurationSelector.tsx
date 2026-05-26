@@ -24,8 +24,8 @@ export function DurationSelector({
           <button
             className={`min-h-12 rounded-full text-lg font-semibold transition ${
               isSelected
-                ? "bg-[#f4ecd9] text-[#07100d]"
-                : "bg-transparent text-[#4d5a51] hover:text-[#dce8cf]"
+                ? "bg-[#f2f2ee] text-[#050505]"
+                : "bg-transparent text-[#777772] hover:text-[#f4f4f2]"
             } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
             disabled={disabled}
             key={duration.minutes}

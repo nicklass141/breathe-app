@@ -26,20 +26,20 @@ export function BreathingSetupForm() {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#9daf96]">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#bdbdb8]">
           Breathe
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.02em] text-[#f8f1e3]">
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.02em] text-[#f4f4f2]">
           Set up your session
         </h1>
-        <p className="mt-3 text-base leading-7 text-[#8a9a8d]">
+        <p className="mt-3 text-base leading-7 text-[#9a9a95]">
           Choose a breathing rhythm and duration, then begin when you are ready.
         </p>
       </div>
 
       <div className="space-y-5">
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-[#f5efe2]">
+          <h2 className="text-sm font-semibold text-[#f4f4f2]">
             Breathing pattern
           </h2>
           <SessionTypeSelector
@@ -50,14 +50,14 @@ export function BreathingSetupForm() {
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-[#f5efe2]">Duration</h2>
+          <h2 className="text-sm font-semibold text-[#f4f4f2]">Duration</h2>
           <DurationSelector
             onSelect={setSelectedMinutes}
             selectedMinutes={selectedMinutes}
           />
         </div>
 
-        <p className="text-xs leading-5 text-[#667467]">
+        <p className="text-xs leading-5 text-[#777772]">
           Breathe gently. Stop if you feel uncomfortable.
         </p>
 

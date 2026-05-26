@@ -11,10 +11,10 @@ type PrimaryButtonProps = {
 
 const variants = {
   primary:
-    "bg-[#cfdcb6] text-[#07100d] shadow-[0_18px_45px_rgba(166,190,139,0.18)] hover:bg-[#e0e9cb]",
+    "bg-[#f2f2ee] text-[#050505] shadow-[0_18px_45px_rgba(255,255,255,0.11)] hover:bg-white",
   secondary:
-    "border border-white/10 bg-[#16241d] text-[#f7f0df] hover:bg-[#1d2f25]",
-  ghost: "bg-transparent text-[#9eaa9a] hover:bg-white/5 hover:text-[#f7f0df]",
+    "border border-white/10 bg-[#151515] text-[#f4f4f2] hover:bg-[#1d1d1d]",
+  ghost: "bg-transparent text-[#9a9a95] hover:bg-white/5 hover:text-[#f4f4f2]",
 };
 
 export function PrimaryButton({
@@ -25,7 +25,7 @@ export function PrimaryButton({
   type = "button",
   variant = "primary",
 }: PrimaryButtonProps) {
-  const className = `inline-flex min-h-14 w-full items-center justify-center rounded-[1.75rem] px-6 text-base font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#dbe8c6] focus:ring-offset-2 focus:ring-offset-[#07100d] disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]}`;
+  const className = `inline-flex min-h-14 w-full items-center justify-center rounded-[1.75rem] px-6 text-base font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505] disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]}`;
 
   if (href) {
     return (

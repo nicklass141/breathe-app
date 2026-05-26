@@ -8,12 +8,12 @@ type AppButtonProps = {
 };
 
 const baseStyles =
-  "inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2";
+  "inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505]";
 
 const variants = {
-  primary: "bg-teal-700 text-white hover:bg-teal-800",
+  primary: "bg-[#f2f2ee] text-[#050505] hover:bg-white",
   secondary:
-    "border border-teal-200 bg-white text-teal-900 hover:border-teal-300 hover:bg-teal-50",
+    "border border-white/10 bg-[#151515] text-[#f4f4f2] hover:bg-[#1d1d1d]",
 };
 
 export function AppButton({

@@ -1,10 +1,5 @@
-import { AppShell } from "@/components/AppShell";
-import { BreathingSetupForm } from "@/components/BreathingSetupForm";
+import { redirect } from "next/navigation";
 
 export default function BreathingSetupPage() {
-  return (
-    <AppShell activeTab="breathe">
-      <BreathingSetupForm />
-    </AppShell>
-  );
+  redirect("/");
 }
