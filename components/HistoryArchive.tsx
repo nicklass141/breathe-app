@@ -6,6 +6,7 @@ import { SoftCard } from "@/components/SoftCard";
 import { useSupabaseAuthStatus } from "@/lib/supabase/auth-status";
 import {
   clearLocalHistory,
+  clearSupabaseHistory,
   fetchSupabaseHistory,
   getLocalHistorySyncStatus,
   readLocalHistory,
@@ -327,8 +328,11 @@ export function HistoryArchive() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [hasUnsyncedLocalHistory, setHasUnsyncedLocalHistory] =
     useState(false);
+  const [isClearingAccountHistory, setIsClearingAccountHistory] =
+    useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isSyncingLocalHistory, setIsSyncingLocalHistory] = useState(false);
+  const [clearError, setClearError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [syncError, setSyncError] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
@@ -399,6 +403,7 @@ export function HistoryArchive() {
       return;
     }
 
+    setClearError("");
     clearLocalHistory();
     setBreathingSessions([]);
     setJournalEntries([]);
@@ -437,6 +442,37 @@ export function HistoryArchive() {
     }
   }
 
+  async function handleClearAccountHistory() {
+    if (!user) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Clear account history? This deletes your breathing and journal history from Supabase for this account.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setClearError("");
+    setIsClearingAccountHistory(true);
+
+    try {
+      await clearSupabaseHistory(user.id);
+      const history = await fetchSupabaseHistory(user.id);
+
+      setBreathingSessions(history.breathingSessions);
+      setJournalEntries(history.journalEntries);
+    } catch {
+      setClearError(
+        "I could not clear your account history. Please try again.",
+      );
+    } finally {
+      setIsClearingAccountHistory(false);
+    }
+  }
+
   const historyGroups = buildHistoryGroups(breathingSessions, journalEntries);
 
   return (
@@ -458,6 +494,12 @@ export function HistoryArchive() {
       {loadError ? (
         <p className="rounded-[1.25rem] bg-[#2a1816] px-4 py-3 text-sm text-[#f5c7bd]">
           {loadError}
+        </p>
+      ) : null}
+
+      {clearError ? (
+        <p className="rounded-[1.25rem] bg-[#2a1816] px-4 py-3 text-sm text-[#f5c7bd]">
+          {clearError}
         </p>
       ) : null}
 
@@ -530,7 +572,18 @@ export function HistoryArchive() {
           >
             Clear history
           </button>
-        ) : null}
+        ) : (
+          <button
+            className="min-h-12 w-full rounded-[1.5rem] text-sm font-semibold text-[#777772] transition hover:bg-white/5 hover:text-[#f4f4f2] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isClearingAccountHistory}
+            onClick={handleClearAccountHistory}
+            type="button"
+          >
+            {isClearingAccountHistory
+              ? "Clearing account history..."
+              : "Clear account history"}
+          </button>
+        )}
       </div>
     </section>
   );

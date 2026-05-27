@@ -349,6 +349,29 @@ export async function fetchSupabaseHistory(userId: string): Promise<HistoryData>
   };
 }
 
+export async function clearSupabaseHistory(userId: string) {
+  const supabase = createClient();
+  const journalResult = await supabase
+    .from("journal_entries")
+    .delete()
+    .eq("user_id", userId);
+
+  if (journalResult.error) {
+    logSupabaseError("journal history delete", journalResult.error);
+    throw new Error(journalResult.error.message);
+  }
+
+  const breathingResult = await supabase
+    .from("breathing_sessions")
+    .delete()
+    .eq("user_id", userId);
+
+  if (breathingResult.error) {
+    logSupabaseError("breathing history delete", breathingResult.error);
+    throw new Error(breathingResult.error.message);
+  }
+}
+
 export async function saveSupabaseBreathingSession(
   userId: string,
   pendingSession: PendingBreathingSession,
