@@ -4,37 +4,16 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SoftCard } from "@/components/SoftCard";
-
-type PendingBreathingSession = {
-  completedAt: string;
-  duration: string;
-  durationSeconds?: number;
-  patternName?: string;
-  sessionType: string;
-};
-
-type JournalEntry = {
-  breathingSessionId?: string;
-  completedAt?: string;
-  date: string;
-  duration?: string;
-  id: string;
-  linkedSession: boolean;
-  moodTags?: string[];
-  reflection1: string;
-  reflection2: string;
-  reflection3: string;
-  sessionType?: string;
-};
-
-type BreathingSession = {
-  completedAt: string;
-  date: string;
-  duration: string;
-  durationSeconds?: number;
-  id: string;
-  sessionType: string;
-};
+import { useSupabaseAuthStatus } from "@/lib/supabase/auth-status";
+import {
+  createId,
+  type PendingBreathingSession,
+  type JournalEntry,
+  saveLocalBreathingSession,
+  saveLocalJournalEntry,
+  saveSupabaseBreathingSession,
+  saveSupabaseJournalEntry,
+} from "@/lib/storage/history";
 
 type ReflectionFormProps = {
   mode?: "linked" | "standalone";
@@ -58,10 +37,6 @@ const moodTags = [
   "Hopeful",
   "Low",
 ];
-
-function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
 
 function formatDate(value?: string) {
   if (!value) {
@@ -94,46 +69,19 @@ function readPendingSession() {
   }
 }
 
-function readLocalArray<T>(key: string) {
-  try {
-    const savedItems = window.localStorage.getItem(key);
-
-    return savedItems ? (JSON.parse(savedItems) as T[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalArray<T>(key: string, items: T[]) {
-  window.localStorage.setItem(key, JSON.stringify(items));
-}
-
-function createBreathingSession(
-  pendingSession: PendingBreathingSession,
-  date: string,
-  id = createId("breathing"),
-): BreathingSession {
-  return {
-    completedAt: pendingSession.completedAt,
-    date,
-    duration: pendingSession.duration,
-    durationSeconds: pendingSession.durationSeconds,
-    id,
-    sessionType: pendingSession.sessionType,
-  };
-}
-
 export function ReflectionForm({
   mode = "linked",
   subtitle = "A few quiet notes after breathing can make the next step clearer.",
   title = "Notice what is here",
 }: ReflectionFormProps) {
   const router = useRouter();
+  const { isLoading: isAuthLoading, user } = useSupabaseAuthStatus();
   const [pendingSession, setPendingSession] =
     useState<PendingBreathingSession | null>(null);
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [answers, setAnswers] = useState(["", "", ""]);
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (mode === "standalone") {
@@ -163,8 +111,9 @@ export function ReflectionForm({
     );
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError("");
 
     const [reflection1, reflection2, reflection3] = answers.map((answer) =>
       answer.trim(),
@@ -190,6 +139,7 @@ export function ReflectionForm({
       completedAt: sessionToSave?.completedAt,
       date: now,
       duration: sessionToSave?.duration,
+      entryType: sessionToSave ? "post_breathing" : "standalone",
       id: createId("journal"),
       linkedSession: hasLinkedSession,
       moodTags: selectedMoodTags,
@@ -199,59 +149,73 @@ export function ReflectionForm({
       sessionType: sessionToSave?.sessionType,
     };
 
+    setIsSaving(true);
+
     try {
-      const journalEntries = readLocalArray<JournalEntry>("journalEntries");
-      writeLocalArray("journalEntries", [journalEntry, ...journalEntries]);
+      if (user) {
+        const breathingSession = sessionToSave
+          ? await saveSupabaseBreathingSession(user.id, sessionToSave)
+          : null;
+
+        await saveSupabaseJournalEntry({
+          breathingSession,
+          entryType: sessionToSave ? "post_breathing" : "standalone",
+          moodTags: selectedMoodTags,
+          reflection1,
+          reflection2,
+          reflection3,
+          userId: user.id,
+        });
+      } else {
+        saveLocalJournalEntry(journalEntry, sessionToSave);
+      }
 
       if (sessionToSave) {
-        const breathingSession = createBreathingSession(
-          sessionToSave,
-          now,
-          breathingSessionId,
-        );
-        const breathingSessions =
-          readLocalArray<BreathingSession>("breathingSessions");
-
-        writeLocalArray("breathingSessions", [
-          breathingSession,
-          ...breathingSessions,
-        ]);
         window.sessionStorage.removeItem("pendingBreathingSession");
       }
 
       router.push("/history");
     } catch {
-      setError("I could not save this reflection in this browser.");
+      setError(
+        user
+          ? "I could not save this reflection to your account. Please try again."
+          : "I could not save this reflection in this browser.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   }
 
-  function handleSkipReflection() {
+  async function handleSkipReflection() {
     if (mode !== "linked") {
       router.push("/history");
       return;
     }
 
+    setError("");
+    setIsSaving(true);
+
     try {
       const sessionToSave = pendingSession ?? readPendingSession();
 
       if (sessionToSave) {
-        const breathingSessions =
-          readLocalArray<BreathingSession>("breathingSessions");
-        const breathingSession = createBreathingSession(
-          sessionToSave,
-          new Date().toISOString(),
-        );
-
-        writeLocalArray("breathingSessions", [
-          breathingSession,
-          ...breathingSessions,
-        ]);
+        if (user) {
+          await saveSupabaseBreathingSession(user.id, sessionToSave);
+        } else {
+          saveLocalBreathingSession(sessionToSave);
+        }
       }
 
       window.sessionStorage.removeItem("pendingBreathingSession");
       router.push("/history");
     } catch {
-      setError("I could not save this breathing session in this browser.");
+      setError(
+        user
+          ? "I could not save this breathing session to your account. Please try again."
+          : "I could not save this breathing session in this browser.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -287,10 +251,11 @@ export function ReflectionForm({
             )}
             <button
               className="shrink-0 rounded-full px-3 py-2 text-xs font-semibold text-[#bdbdb8] transition hover:bg-white/5 hover:text-[#f4f4f2]"
+              disabled={isSaving || isAuthLoading}
               onClick={handleSkipReflection}
               type="button"
             >
-              Skip reflection
+              {isSaving ? "Saving..." : "Skip reflection"}
             </button>
           </div>
         </SoftCard>
@@ -356,7 +321,9 @@ export function ReflectionForm({
         ) : null}
 
         <div className="space-y-3 pt-2">
-          <PrimaryButton type="submit">Save reflection</PrimaryButton>
+          <PrimaryButton disabled={isSaving || isAuthLoading} type="submit">
+            {isSaving ? "Saving..." : "Save reflection"}
+          </PrimaryButton>
           <PrimaryButton href="/history" variant="secondary">
             View history
           </PrimaryButton>

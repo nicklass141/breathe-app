@@ -3,30 +3,16 @@
 import { useEffect, useState } from "react";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { SoftCard } from "@/components/SoftCard";
+import { useSupabaseAuthStatus } from "@/lib/supabase/auth-status";
+import {
+  clearLocalHistory,
+  fetchSupabaseHistory,
+  readLocalHistory,
+  type BreathingSession,
+  type JournalEntry,
+} from "@/lib/storage/history";
 
 const nearbyEntryWindowMs = 10 * 60 * 1000;
-
-type BreathingSession = {
-  completedAt?: string;
-  date: string;
-  duration: string;
-  id: string;
-  sessionType: string;
-};
-
-type JournalEntry = {
-  breathingSessionId?: string;
-  completedAt?: string;
-  date: string;
-  duration?: string;
-  id: string;
-  linkedSession?: boolean;
-  moodTags?: string[];
-  reflection1: string;
-  reflection2: string;
-  reflection3: string;
-  sessionType?: string;
-};
 
 type HistoryGroup = {
   breathingSession?: BreathingSession;
@@ -51,16 +37,6 @@ function formatDate(value?: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
-}
-
-function readLocalArray<T>(key: string) {
-  try {
-    const savedItems = window.localStorage.getItem(key);
-
-    return savedItems ? (JSON.parse(savedItems) as T[]) : [];
-  } catch {
-    return [];
-  }
 }
 
 function getTime(value?: string) {
@@ -342,25 +318,72 @@ function HistoryCard({ group }: { group: HistoryGroup }) {
 }
 
 export function HistoryArchive() {
+  const { isLoading: isAuthLoading, user } = useSupabaseAuthStatus();
   const [breathingSessions, setBreathingSessions] = useState<
     BreathingSession[]
   >([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    // Storage is browser-only, so history hydrates after this client component mounts.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setBreathingSessions(readLocalArray<BreathingSession>("breathingSessions"));
-    setJournalEntries(readLocalArray<JournalEntry>("journalEntries"));
-  }, []);
+    if (isAuthLoading) {
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadHistory() {
+      setIsLoadingHistory(true);
+      setLoadError("");
+
+      try {
+        const history = user
+          ? await fetchSupabaseHistory(user.id)
+          : readLocalHistory();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setBreathingSessions(history.breathingSessions);
+        setJournalEntries(history.journalEntries);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setLoadError(
+          user
+            ? "I could not load your account history. Please try refreshing."
+            : "I could not load the history saved on this device.",
+        );
+        setBreathingSessions([]);
+        setJournalEntries([]);
+      } finally {
+        if (isMounted) {
+          setIsLoadingHistory(false);
+        }
+      }
+    }
+
+    void loadHistory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthLoading, user]);
 
   function handleClearHistory() {
+    if (user) {
+      return;
+    }
+
     if (!window.confirm("Clear all breathing and journal history?")) {
       return;
     }
 
-    window.localStorage.removeItem("breathingSessions");
-    window.localStorage.removeItem("journalEntries");
+    clearLocalHistory();
     setBreathingSessions([]);
     setJournalEntries([]);
   }
@@ -377,11 +400,21 @@ export function HistoryArchive() {
           Your quiet archive
         </h1>
         <p className="mt-3 text-base leading-7 text-[#9a9a95]">
-          Breathing and journal moments are grouped when they belong together.
+          {user
+            ? "Your account history is loaded from Supabase."
+            : "Breathing and journal moments are grouped when they belong together."}
         </p>
       </div>
 
-      {historyGroups.length ? (
+      {loadError ? (
+        <p className="rounded-[1.25rem] bg-[#2a1816] px-4 py-3 text-sm text-[#f5c7bd]">
+          {loadError}
+        </p>
+      ) : null}
+
+      {isLoadingHistory || isAuthLoading ? (
+        <EmptyHistorySection message="Loading history..." />
+      ) : historyGroups.length ? (
         <div className="grid gap-3">
           {historyGroups.map((group) => (
             <HistoryCard group={group} key={group.id} />
@@ -393,13 +426,15 @@ export function HistoryArchive() {
 
       <div className="space-y-3 pt-2">
         <PrimaryButton href="/">Start a new session</PrimaryButton>
-        <button
-          className="min-h-12 w-full rounded-[1.5rem] text-sm font-semibold text-[#777772] transition hover:bg-white/5 hover:text-[#f4f4f2]"
-          onClick={handleClearHistory}
-          type="button"
-        >
-          Clear history
-        </button>
+        {!user ? (
+          <button
+            className="min-h-12 w-full rounded-[1.5rem] text-sm font-semibold text-[#777772] transition hover:bg-white/5 hover:text-[#f4f4f2]"
+            onClick={handleClearHistory}
+            type="button"
+          >
+            Clear history
+          </button>
+        ) : null}
       </div>
     </section>
   );
