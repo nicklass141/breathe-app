@@ -147,8 +147,8 @@ export function SettingsMenu() {
                         Signed in as {user.email}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-[#9a9a95]">
-                        Syncing will be added later. For now, entries still save
-                        on this device.
+                        New entries save to your account. Local guest history
+                        can be synced from History.
                       </p>
                     </div>
                     <button

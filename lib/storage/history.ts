@@ -39,6 +39,11 @@ export type HistoryData = {
   journalEntries: JournalEntry[];
 };
 
+export type LocalHistorySyncStatus = {
+  hasLocalHistory: boolean;
+  isAlreadySynced: boolean;
+};
+
 type SupabaseBreathingSessionRow = Record<string, unknown> & {
   completed?: boolean | null;
   completed_at?: string | null;
@@ -68,6 +73,8 @@ const breathingSessionColumns =
 
 const journalEntryColumns =
   "id,user_id,created_at,breathing_session_id,mood_tags,reflection1,reflection2,reflection3,entry_type";
+
+const localHistorySyncedAtKey = "localHistorySyncedAt";
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -164,26 +171,33 @@ function toNumber(value: unknown) {
 
 function toMoodTags(value: unknown) {
   return Array.isArray(value)
-    ? value.filter((tag): tag is string => typeof tag === "string" && Boolean(tag))
+    ? value.filter(
+        (tag): tag is string => typeof tag === "string" && Boolean(tag),
+      )
     : [];
 }
 
-function getDurationMinutes(pendingSession: PendingBreathingSession) {
-  const durationFromText = Number.parseInt(pendingSession.duration, 10);
+function getDurationMinutesFromValues(
+  duration?: string,
+  durationSeconds?: number,
+) {
+  const durationFromText = Number.parseInt(duration ?? "", 10);
 
   if (Number.isFinite(durationFromText)) {
     return durationFromText;
   }
 
-  if (pendingSession.durationSeconds) {
-    return Math.round(pendingSession.durationSeconds / 60);
+  if (durationSeconds) {
+    return Math.round(durationSeconds / 60);
   }
 
   return null;
 }
 
-function getPatternValue(pendingSession: PendingBreathingSession) {
-  return (pendingSession.patternName ?? pendingSession.sessionType)
+function getPatternValueFromLabel(label?: string) {
+  const patternLabel = label?.trim() || "breathing";
+
+  return patternLabel
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
@@ -226,6 +240,77 @@ function mapJournalEntry(row: SupabaseJournalEntryRow): JournalEntry {
     reflection2: toString(row.reflection2),
     reflection3: toString(row.reflection3),
   };
+}
+
+function getLocalHistorySignature(history: HistoryData) {
+  return JSON.stringify({
+    breathingSessions: history.breathingSessions.map((session) => ({
+      completedAt: session.completedAt,
+      date: session.date,
+      duration: session.duration,
+      durationSeconds: session.durationSeconds,
+      id: session.id,
+      sessionType: session.sessionType,
+    })),
+    journalEntries: history.journalEntries.map((entry) => ({
+      breathingSessionId: entry.breathingSessionId,
+      date: entry.date,
+      entryType: entry.entryType,
+      id: entry.id,
+      moodTags: entry.moodTags ?? [],
+      reflection1: entry.reflection1,
+      reflection2: entry.reflection2,
+      reflection3: entry.reflection3,
+    })),
+  });
+}
+
+function getUserSyncSignatureKey(userId: string) {
+  return `${localHistorySyncedAtKey}:${userId}:signature`;
+}
+
+function getJournalEntryType(entry: JournalEntry) {
+  if (entry.entryType) {
+    return entry.entryType;
+  }
+
+  return entry.breathingSessionId || entry.linkedSession
+    ? "post_breathing"
+    : "standalone";
+}
+
+export function getLocalHistorySyncStatus(
+  userId: string,
+): LocalHistorySyncStatus {
+  const history = readLocalHistory();
+  const hasLocalHistory = Boolean(
+    history.breathingSessions.length || history.journalEntries.length,
+  );
+
+  if (!hasLocalHistory) {
+    return {
+      hasLocalHistory: false,
+      isAlreadySynced: false,
+    };
+  }
+
+  const currentSignature = getLocalHistorySignature(history);
+  const syncedSignature = window.localStorage.getItem(
+    getUserSyncSignatureKey(userId),
+  );
+
+  return {
+    hasLocalHistory,
+    isAlreadySynced: syncedSignature === currentSignature,
+  };
+}
+
+function markLocalHistorySynced(userId: string, history: HistoryData) {
+  window.localStorage.setItem(localHistorySyncedAtKey, new Date().toISOString());
+  window.localStorage.setItem(
+    getUserSyncSignatureKey(userId),
+    getLocalHistorySignature(history),
+  );
 }
 
 export async function fetchSupabaseHistory(userId: string): Promise<HistoryData> {
@@ -274,9 +359,14 @@ export async function saveSupabaseBreathingSession(
     .insert({
       completed_at: pendingSession.completedAt,
       completed: true,
-      duration_minutes: getDurationMinutes(pendingSession),
+      duration_minutes: getDurationMinutesFromValues(
+        pendingSession.duration,
+        pendingSession.durationSeconds,
+      ),
       duration_seconds: pendingSession.durationSeconds ?? null,
-      pattern: getPatternValue(pendingSession),
+      pattern: getPatternValueFromLabel(
+        pendingSession.patternName ?? pendingSession.sessionType,
+      ),
       pattern_label: pendingSession.sessionType,
       user_id: userId,
     })
@@ -329,6 +419,69 @@ export async function saveSupabaseJournalEntry({
   }
 
   return mapJournalEntry(data as SupabaseJournalEntryRow);
+}
+
+export async function syncLocalHistoryToSupabase(userId: string) {
+  const history = readLocalHistory();
+  const breathingSessionIdMap = new Map<string, string>();
+  const supabase = createClient();
+
+  for (const session of history.breathingSessions) {
+    const { data, error } = await supabase
+      .from("breathing_sessions")
+      .insert({
+        completed_at: session.completedAt ?? session.date,
+        completed: true,
+        duration_minutes: getDurationMinutesFromValues(
+          session.duration,
+          session.durationSeconds,
+        ),
+        duration_seconds: session.durationSeconds ?? null,
+        pattern: getPatternValueFromLabel(session.sessionType),
+        pattern_label: session.sessionType,
+        user_id: userId,
+      })
+      .select(breathingSessionColumns)
+      .single();
+
+    if (error) {
+      logSupabaseError("local breathing history sync", error);
+      throw new Error(error.message);
+    }
+
+    const syncedSession = mapBreathingSession(
+      data as SupabaseBreathingSessionRow,
+    );
+
+    breathingSessionIdMap.set(session.id, syncedSession.id);
+  }
+
+  for (const entry of history.journalEntries) {
+    const linkedBreathingSessionId = entry.breathingSessionId
+      ? breathingSessionIdMap.get(entry.breathingSessionId)
+      : null;
+    const { error } = await supabase.from("journal_entries").insert({
+      breathing_session_id: linkedBreathingSessionId ?? null,
+      entry_type: getJournalEntryType(entry),
+      mood_tags: toMoodTags(entry.moodTags),
+      reflection1: entry.reflection1,
+      reflection2: entry.reflection2,
+      reflection3: entry.reflection3,
+      user_id: userId,
+    });
+
+    if (error) {
+      logSupabaseError("local journal history sync", error);
+      throw new Error(error.message);
+    }
+  }
+
+  markLocalHistorySynced(userId, history);
+
+  return {
+    breathingCount: history.breathingSessions.length,
+    journalCount: history.journalEntries.length,
+  };
 }
 
 export { createId };

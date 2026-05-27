@@ -7,7 +7,9 @@ import { useSupabaseAuthStatus } from "@/lib/supabase/auth-status";
 import {
   clearLocalHistory,
   fetchSupabaseHistory,
+  getLocalHistorySyncStatus,
   readLocalHistory,
+  syncLocalHistoryToSupabase,
   type BreathingSession,
   type JournalEntry,
 } from "@/lib/storage/history";
@@ -323,8 +325,13 @@ export function HistoryArchive() {
     BreathingSession[]
   >([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [hasUnsyncedLocalHistory, setHasUnsyncedLocalHistory] =
+    useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isSyncingLocalHistory, setIsSyncingLocalHistory] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [syncError, setSyncError] = useState("");
+  const [syncMessage, setSyncMessage] = useState("");
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -348,6 +355,15 @@ export function HistoryArchive() {
 
         setBreathingSessions(history.breathingSessions);
         setJournalEntries(history.journalEntries);
+
+        if (user) {
+          const syncStatus = getLocalHistorySyncStatus(user.id);
+          setHasUnsyncedLocalHistory(
+            syncStatus.hasLocalHistory && !syncStatus.isAlreadySynced,
+          );
+        } else {
+          setHasUnsyncedLocalHistory(false);
+        }
       } catch {
         if (!isMounted) {
           return;
@@ -388,6 +404,39 @@ export function HistoryArchive() {
     setJournalEntries([]);
   }
 
+  function handleDismissSyncPrompt() {
+    setHasUnsyncedLocalHistory(false);
+    setSyncError("");
+  }
+
+  async function handleSyncLocalHistory() {
+    if (!user) {
+      return;
+    }
+
+    setIsSyncingLocalHistory(true);
+    setSyncError("");
+    setSyncMessage("");
+
+    try {
+      await syncLocalHistoryToSupabase(user.id);
+      const history = await fetchSupabaseHistory(user.id);
+
+      setBreathingSessions(history.breathingSessions);
+      setJournalEntries(history.journalEntries);
+      setHasUnsyncedLocalHistory(false);
+      setSyncMessage(
+        "Local history synced to your account. Your local copy is still on this device.",
+      );
+    } catch {
+      setSyncError(
+        "I could not sync the history saved on this device. Please try again.",
+      );
+    } finally {
+      setIsSyncingLocalHistory(false);
+    }
+  }
+
   const historyGroups = buildHistoryGroups(breathingSessions, journalEntries);
 
   return (
@@ -410,6 +459,53 @@ export function HistoryArchive() {
         <p className="rounded-[1.25rem] bg-[#2a1816] px-4 py-3 text-sm text-[#f5c7bd]">
           {loadError}
         </p>
+      ) : null}
+
+      {user && (hasUnsyncedLocalHistory || syncMessage || syncError) ? (
+        <SoftCard className="p-4">
+          <div className="space-y-3">
+            {hasUnsyncedLocalHistory ? (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-[#f4f4f2]">
+                    You have history saved on this device.
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#9a9a95]">
+                    Sync it to your account?
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="min-h-11 rounded-full bg-[#f2f2ee] px-4 text-sm font-semibold text-[#050505] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSyncingLocalHistory}
+                    onClick={handleSyncLocalHistory}
+                    type="button"
+                  >
+                    {isSyncingLocalHistory ? "Syncing..." : "Sync to account"}
+                  </button>
+                  <button
+                    className="min-h-11 rounded-full border border-white/10 px-4 text-sm font-semibold text-[#bdbdb8] transition hover:bg-white/5 hover:text-[#f4f4f2]"
+                    disabled={isSyncingLocalHistory}
+                    onClick={handleDismissSyncPrompt}
+                    type="button"
+                  >
+                    Not now
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {syncMessage ? (
+              <p className="text-sm leading-6 text-[#d1d1cc]">{syncMessage}</p>
+            ) : null}
+
+            {syncError ? (
+              <p className="rounded-[1.25rem] bg-[#2a1816] px-4 py-3 text-sm text-[#f5c7bd]">
+                {syncError}
+              </p>
+            ) : null}
+          </div>
+        </SoftCard>
       ) : null}
 
       {isLoadingHistory || isAuthLoading ? (
