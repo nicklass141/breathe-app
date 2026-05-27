@@ -214,16 +214,14 @@ export function MainBreathingScreen() {
       </div>
 
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3 text-left">
+        <div className="mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-3 text-left">
           <CompactSelector
             disabled={controlsDisabled}
-            label="Breathing"
             onClick={() => setActiveSheet("breathing")}
             value={selectedPattern.name}
           />
           <CompactSelector
             disabled={controlsDisabled}
-            label="Time"
             onClick={() => setActiveSheet("time")}
             value={`${selectedMinutes} min`}
           />
@@ -288,30 +286,25 @@ export function MainBreathingScreen() {
 
 type CompactSelectorProps = {
   disabled: boolean;
-  label: string;
   onClick: () => void;
   value: string;
 };
 
 function CompactSelector({
   disabled,
-  label,
   onClick,
   value,
 }: CompactSelectorProps) {
   return (
     <button
-      className={`min-h-14 rounded-[1.35rem] border border-white/8 bg-[#111111]/92 px-4 text-left transition hover:border-[#3a3a3a] focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505] ${
+      className={`inline-flex min-h-12 w-full items-center justify-center rounded-[1.35rem] border border-white/8 bg-[#111111]/92 px-4 text-center transition hover:border-[#3a3a3a] focus:outline-none focus:ring-2 focus:ring-[#f2f2ee] focus:ring-offset-2 focus:ring-offset-[#050505] ${
         disabled ? "cursor-not-allowed opacity-60" : ""
       }`}
       disabled={disabled}
       onClick={onClick}
       type="button"
     >
-      <span className="block text-xs font-semibold uppercase text-[#8a8a85]">
-        {label}
-      </span>
-      <span className="mt-1 flex items-center justify-between gap-2 text-sm font-semibold text-[#f4f4f2]">
+      <span className="block text-sm font-semibold text-[#f4f4f2]">
         {value}
       </span>
     </button>
