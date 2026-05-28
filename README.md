@@ -22,7 +22,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Supabase setup
 
-Supabase client helpers are prepared in `lib/supabase`, but authentication and database saving are not implemented yet. The app still runs in guest mode and stores breathing sessions and journal entries in localStorage.
+Supabase authentication and account history storage are enabled. Logged-out users still run in guest mode and store breathing sessions and journal entries in localStorage.
 
 To prepare Supabase locally, copy `.env.example` to `.env.local` and fill in:
 
@@ -32,6 +32,21 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
 You can find these values in your Supabase project settings. Do not commit `.env.local`.
+
+In Supabase Auth URL Configuration, set the production Site URL to the live Vercel app URL, for example:
+
+```text
+https://breathe-app-flax.vercel.app
+```
+
+Add both production and local redirect URLs, for example:
+
+```text
+https://breathe-app-flax.vercel.app/auth
+http://localhost:3000/auth
+```
+
+The signup form also passes the current app origin as `emailRedirectTo`, so local signup returns to localhost and live signup returns to the deployed app.
 
 ## Learn More
 

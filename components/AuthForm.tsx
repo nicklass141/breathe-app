@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useSupabaseAuthStatus } from "@/lib/supabase/auth-status";
 import { createClient } from "@/lib/supabase/client";
 
@@ -13,6 +13,8 @@ export function AuthForm() {
   const {
     error: configurationError,
     isConfigured,
+    isLoading: isAuthLoading,
+    user,
   } = useSupabaseAuthStatus();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -20,6 +22,30 @@ export function AuthForm() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthLoading || !isConfigured) {
+      return;
+    }
+
+    if (user) {
+      router.push("/");
+      return;
+    }
+
+    const authSearch = window.location.search;
+    const authHash = window.location.hash;
+    const cameFromEmailLink =
+      authSearch.includes("code=") ||
+      authSearch.includes("token_hash=") ||
+      authHash.includes("access_token=");
+
+    if (cameFromEmailLink) {
+      // The confirmation link can only be inspected after the browser page mounts.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMessage("Email confirmed. Log in to continue.");
+    }
+  }, [isAuthLoading, isConfigured, router, user]);
 
   function handleModeChange(nextMode: AuthMode) {
     setMode(nextMode);
@@ -61,6 +87,9 @@ export function AuthForm() {
             })
           : await supabase.auth.signUp({
               email: trimmedEmail,
+              options: {
+                emailRedirectTo: `${window.location.origin}/auth`,
+              },
               password,
             });
 
